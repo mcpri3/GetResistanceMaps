@@ -1,0 +1,88 @@
+---
+title: "Habitat suitability modeling test"
+output: pdf_document
+date: "`r Sys.Date()`"
+params:
+  group: Mammalia
+  Nclus: 7
+  mode: EqualTraitsEnv
+  clus.id: 1
+---
+# `r gsub('-',', ',params$group)`
+
+```{r, setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "/Users/primam/Documents/LECA/NaturaConnect/Rprojects/03_GetResistanceMaps")
+```
+
+```{r echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+library(flextable)
+# Read list of SNAP species 
+lst.sp <- openxlsx::read.xlsx(here::here(paste0('data/raw-data/FunctionalGroups/FinalList-of-SNAP-Vertebrate-Species_ActT-Diet-ForagS-NestH-Morpho-HabPref-DispD-MoveMod-LifeHist-PressureTraits_', 
+params$group, '_GroupID_K=', params$Nclus, '_Weight-', params$mode,'.xlsx')))
+
+  occur <- terra::vect(here::here(paste0('data/derived-data/inputSDM/OccurrenceData_France_', params$group, '_GroupID_K=', params$clus.id, '_Res1000_2010-2020.gpkg')))
+  n.abs <- ifelse(nrow(occur) < 5000, 5000, nrow(occur))
+
+  sub.lst <- lst.sp[lst.sp$cluster.id %in% params$clus.id, ]
+```
+**Functional group `r params$clus.id` ; Number of species: `r nrow(sub.lst)`**
+
+```{r echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+  flx = flextable::flextable(sub.lst[, c("LB_NOM_VALIDE_SPE_LEVEL", "ORDRE")])
+  flx = flextable::set_header_labels(flx, values = list(LB_NOM_VALIDE_SPE_LEVEL='Species name',
+                                           ORDRE='Order'))
+  flx = flextable::bold(flx, bold = TRUE, part = "header")
+  flx = flextable::autofit(flx)
+  flx
+  
+  
+myBiomodData <- readRDS(here::here(paste0('./data/derived-data/outputSDM/', params$group,'.GroupID.', params$clus.id,'/myBiomodData')))
+myBiomodModelOut <- readRDS(here::here(paste0('./data/derived-data/outputSDM/', params$group,'.GroupID.', params$clus.id,'/myBiomodModelOut')))
+myBiomodEM <- readRDS(here::here(paste0('./data/derived-data/outputSDM/', params$group,'.GroupID.', params$clus.id,'/myBiomodEM')))
+myBiomodEMProj <- readRDS(here::here(paste0('./data/derived-data/outputSDM/', params$group,'.GroupID.', params$clus.id,'/myBiomodEMProj')))
+
+```
+
+In total, `r nrow(occur)` pixels of 1km^2^ were occupied by the group within metropolitan France and `r n.abs` pseudo-absences were randomly generated over the same territory (3 times, see figures below).
+
+The final habitat suitability maps were generated using 3 families of machine learning algorithms (SDM models):
+
+-   neural network: artificial neural network (ANN)
+
+-   bagging model: random forest (RF)
+
+-   boosting model: Extreme gradient boosting (XGBOOST)
+
+For each family, 15 models were generated using different presence/pseudo-absence composition within the calibration/validation dataset. Each model was calibrated using 80% of the initial dataset and the remaining 20% was used to produce validation indicators (ROC and TSS). All models that passed the validation threshold (i.e., TSS \> 0.6) were combined to produce ensemble models (either using probability mean, probability weighted mean or committee averaging). Finally, we produced a map of presence probability for the group from each ensemble model.
+
+Explanatory variables that were used in these models included the same variables as the one used for environmental PCA (work task 1 for functional group definition).
+
+\pagebreak
+Distribution of presences and generated pseudo-absences:
+```{r echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.align='left'}
+c = biomod2::plot(myBiomodData)
+```
+
+\pagebreak
+Distribution of evaluation metrics for the calibration and validation datasets:
+```{r echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.align='left'}
+
+  c = biomod2::bm_PlotEvalBoxplot(bm.out = myBiomodModelOut, dataset = 'calibration', group.by = c('algo', 'algo'))
+  c = biomod2::bm_PlotEvalBoxplot(bm.out = myBiomodModelOut, dataset = 'validation', group.by = c('algo', 'algo'))
+
+```
+
+\pagebreak
+Importance of the environmental variables for the calculation of presence probabilities: 
+```{r echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.align='left', fig.width=25, fig.height=15, out.extra='angle=90'}
+  c = biomod2::bm_PlotVarImpBoxplot(bm.out = myBiomodModelOut, group.by = c('expl.var', 'algo', 'algo'))
+
+```
+
+\pagebreak
+Projection of the ensemble models over the whole territory to predict group presence probabilities (multiplied by 1000 here): 
+```{r echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.align='left', fig.width=20, fig.height=15}
+  c =   biomod2::plot(myBiomodEMProj)
+```
