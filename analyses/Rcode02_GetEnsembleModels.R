@@ -16,9 +16,9 @@ disk.max <- 50000
 nrep.PA <- 3 
 
 # Params for modelling
-lst.mod <- c("XGBOOST", "RF", "ANN")
-# lst.mod <- c("GAM")
-nCrossVal <-5
+lst.mod <- c("XGBOOST", "RF", "MAXNET", "ANN")
+# lst.mod <- c("MAXNET", "MAXENT")
+nCrossVal <- 5
 cv.perc <- 0.8
 nperm.var.imp <- 3
 cpu = 8
@@ -33,7 +33,9 @@ for (i in 1:nrow(combi.doable)) {
     
   occur <- terra::vect(here::here(paste0('data/derived-data/inputSDM/OccurrenceData_France_', g, '_GroupID_K=', c, '_Res1000_2010-2020.gpkg')))
   n.abs <- ifelse(nrow(occur) < 5000, 5000, nrow(occur))
-
+  n.abs <- ifelse(nrow(occur) < 500, 500, n.abs)
+  nrep.PA <- ifelse(nrow(occur) < 500, 50, nrep.PA)
+  
   # Format Data with pseudo-absences 
   myBiomodData <- biomod2::BIOMOD_FormatingData(resp.name = paste0(g, '_GroupID_', c),
                                         resp.var = occur,
@@ -53,19 +55,10 @@ for (i in 1:nrow(combi.doable)) {
   
   myBiomodOptions <- biomod2::BIOMOD_ModelingOptions()
   
-  # system.time(
-  #   bm.tuning <- biomod2::BIOMOD_Tuning(bm.format = myBiomodData, 
-  #                                       ME.env = env, ME.n.bg = terra::ncell(env), models = c("RF", "GAM"))
-  # )
-  # 
-  # plot(bm.tuning$tune.RF)
-  # plot(bm.tuning$tune.GAM)
-  # 
-  # # Get tuned modeling options
-  # myBiomodOptions <- bm.tuning$models.options
-  
   myBiomodOptions@XGBOOST$nthread <- cpu
-  
+  myBiomodOptions@XGBOOST$max.depth <- 3
+  myBiomodOptions@RF$nodesize <- round(nrow(occur)/10)
+  # myBiomodOptions@RF$mtry <- 0.2
   
   tic = Sys.time()
   myBiomodModelOut <- try(biomod2::BIOMOD_Modeling(bm.format = myBiomodData,
@@ -80,8 +73,8 @@ for (i in 1:nrow(combi.doable)) {
                                                nb.cpu = cpu))
                           
   Sys.time() - tic
-  
-  
+  eval <- myBiomodModelOut@models.evaluation@val
+  eval <- eval[eval$metric.eval == 'TSS',]
   saveRDS(myBiomodModelOut, here::here(paste0('./data/derived-data/outputSDM/', g,'.GroupID.', c,'/myBiomodModelOut')))
 
   # Get evaluation scores & variables importance
@@ -123,7 +116,7 @@ for (i in 1:nrow(combi.doable)) {
                                                  em.by = 'all',
                                                  em.algo = ens.calc ,
                                                  metric.select = c('TSS'),
-                                                 metric.select.thresh = c(0.6),
+                                                 metric.select.thresh = c(0.4),
                                                  metric.eval = c('TSS', 'ROC'),
                                                  var.import = nperm.var.imp, 
                                                  nb.cpu = cpu)
@@ -160,4 +153,23 @@ for (i in 1:nrow(combi.doable)) {
                       params = list(group = g, Nclus = k, mode = combi.doable$mode[i], clus.id = c))
   
   }
+}
+
+
+
+################################
+# Get SDM summary
+################################
+combi.doable <- openxlsx::read.xlsx(here::here('data/raw-data/FunctionalGroups/List-of-clustering-schemes.xlsx'))
+
+for (i in 1:nrow(combi.doable)) {
+  
+  g <- combi.doable$group[i]
+  k <- combi.doable$Nclus[i]
+  
+  for (c in c(1:k)) {
+  rmarkdown::render(here::here('outputs/HabSuitModTest.Rmd'), output_format = 'pdf_document', 
+                    output_file = sprintf("HabSuitMod-for_%s_K=%s.pdf", g, c), 
+                    params = list(group = g, Nclus = k, mode = combi.doable$mode[i], clus.id = c))
   }
+}

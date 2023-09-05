@@ -4,7 +4,9 @@
 #################################################
 rm(list = ls())
 setwd('/bettik/primam/03_GetResistanceMaps')
-install.packages('biomod2', lib = '../local_lib', repos = "http://cran.us.r-project.org")
+#install.packages('biomod2', lib = '../local_lib', repos = "http://cran.us.r-project.org")
+#install.packages('glmnet', lib = '../local_lib', repos = 'http://cran.us.r-project.org')
+library(glmnet, lib.loc = "../local_lib")
 library(biomod2, lib.loc = '../local_lib')
 
 env <- terra::rast(here::here('data/derived-data/inputSDM/EnvironmentalVariables_France_Res1000m.tif'))
@@ -17,7 +19,7 @@ disk.max <- 50000
 nrep.PA <- 3 
 
 # Params for modelling
-lst.mod <- c("XGBOOST", "RF", "ANN")
+lst.mod <- c("XGBOOST", "RF", "ANN",  "MAXNET")
 nCrossVal <-5
 cv.perc <- 0.8
 nperm.var.imp <- 3
@@ -29,6 +31,8 @@ c <- as.numeric(args[2])
 
 occur <- terra::vect(here::here(paste0('data/derived-data/inputSDM/OccurrenceData_France_', g, '_GroupID_K=', c, '_Res1000_2010-2020.gpkg')))
 n.abs <- ifelse(nrow(occur) < 5000, 5000, nrow(occur))
+n.abs <- ifelse(nrow(occur) < 500, 500, n.abs)
+nrep.PA <- ifelse(nrow(occur) < 500, 50, nrep.PA)
 
 # Format Data with pseudo-absences 
 myBiomodData <- biomod2::BIOMOD_FormatingData(resp.name = paste0(g, '_GroupID_', c),
@@ -43,6 +47,9 @@ myBiomodData <- biomod2::BIOMOD_FormatingData(resp.name = paste0(g, '_GroupID_',
                                               filter.raster = T)
 
 myBiomodOptions <- biomod2::BIOMOD_ModelingOptions()
+myBiomodOptions@XGBOOST$max.depth <- 3
+myBiomodOptions@RF$nodesize <- round(nrow(occur)/10)
+
 myBiomodModelOut <- try(biomod2::BIOMOD_Modeling(bm.format = myBiomodData,
                                                  modeling.id = 'AllModels',
                                                  models = lst.mod,
@@ -62,7 +69,7 @@ myBiomodEM <- biomod2::BIOMOD_EnsembleModeling(bm.mod = myBiomodModelOut,
                                                em.by = 'all',
                                                em.algo = ens.calc ,
                                                metric.select = c('TSS'),
-                                               metric.select.thresh = c(0.6),
+                                               metric.select.thresh = c(0.4),
                                                metric.eval = c('TSS', 'ROC'),
                                                var.import = nperm.var.imp)
 saveRDS(myBiomodEM, here::here(paste0('./data/derived-data/outputSDM/', g,'.GroupID.', c,'/myBiomodEM')))

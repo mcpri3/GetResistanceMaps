@@ -4,9 +4,9 @@ output: pdf_document
 date: "`r Sys.Date()`"
 params:
   group: Mammalia
-  Nclus: 7
+  Nclus: 11
   mode: EqualTraitsEnv
-  clus.id: 1
+  clus.id: 2
 ---
 # `r gsub('-',', ',params$group)`
 
@@ -23,6 +23,9 @@ params$group, '_GroupID_K=', params$Nclus, '_Weight-', params$mode,'.xlsx')))
 
   occur <- terra::vect(here::here(paste0('data/derived-data/inputSDM/OccurrenceData_France_', params$group, '_GroupID_K=', params$clus.id, '_Res1000_2010-2020.gpkg')))
   n.abs <- ifelse(nrow(occur) < 5000, 5000, nrow(occur))
+  n.abs <- ifelse(nrow(occur) < 500, 500, n.abs)
+  nrep.PA <- 3
+  nrep.PA <- ifelse(nrow(occur) < 500, 50, nrep.PA)
 
   sub.lst <- lst.sp[lst.sp$cluster.id %in% params$clus.id, ]
 ```
@@ -45,9 +48,9 @@ myBiomodEMProj <- readRDS(here::here(paste0('./data/derived-data/outputSDM/', pa
 
 ```
 
-In total, `r nrow(occur)` pixels of 1km^2^ were occupied by the group within metropolitan France and `r n.abs` pseudo-absences were randomly generated over the same territory (3 times, see figures below).
+In total, `r nrow(occur)` pixels of 1km^2^ were occupied by the group within metropolitan France and `r n.abs` pseudo-absences were randomly generated over the same territory (`r nrep.PA` times, see figures below).
 
-The final habitat suitability maps were generated using 3 families of machine learning algorithms (SDM models):
+The final habitat suitability maps were generated using 4 families of machine learning algorithms (SDM models):
 
 -   neural network: artificial neural network (ANN)
 
@@ -55,34 +58,36 @@ The final habitat suitability maps were generated using 3 families of machine le
 
 -   boosting model: Extreme gradient boosting (XGBOOST)
 
-For each family, 15 models were generated using different presence/pseudo-absence composition within the calibration/validation dataset. Each model was calibrated using 80% of the initial dataset and the remaining 20% was used to produce validation indicators (ROC and TSS). All models that passed the validation threshold (i.e., TSS \> 0.6) were combined to produce ensemble models (either using probability mean, probability weighted mean or committee averaging). Finally, we produced a map of presence probability for the group from each ensemble model.
+-   maximum entropy model: MAXNET 
+
+For each family, `r nrep.PA*5` models were generated using different presence/pseudo-absence composition within the calibration/validation dataset. Each model was calibrated using 80% of the initial dataset and the remaining 20% was used to produce validation indicators (ROC and TSS). All models that passed the validation threshold (i.e., TSS \> 0.4) were combined to produce ensemble models (either using probability weighted mean or committee averaging). Finally, we produced a map of presence probability for the group from each ensemble model.
 
 Explanatory variables that were used in these models included the same variables as the one used for environmental PCA (work task 1 for functional group definition).
 
 \pagebreak
 Distribution of presences and generated pseudo-absences:
 ```{r echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.align='left'}
-c = biomod2::plot(myBiomodData)
+dummy = biomod2::plot(myBiomodData)
 ```
 
 \pagebreak
 Distribution of evaluation metrics for the calibration and validation datasets:
 ```{r echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.align='left'}
 
-  c = biomod2::bm_PlotEvalBoxplot(bm.out = myBiomodModelOut, dataset = 'calibration', group.by = c('algo', 'algo'))
-  c = biomod2::bm_PlotEvalBoxplot(bm.out = myBiomodModelOut, dataset = 'validation', group.by = c('algo', 'algo'))
+  dummy = biomod2::bm_PlotEvalBoxplot(bm.out = myBiomodModelOut, dataset = 'calibration', group.by = c('algo', 'algo'))
+  dummy = biomod2::bm_PlotEvalBoxplot(bm.out = myBiomodModelOut, dataset = 'validation', group.by = c('algo', 'algo'))
 
 ```
 
 \pagebreak
 Importance of the environmental variables for the calculation of presence probabilities: 
 ```{r echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.align='left', fig.width=25, fig.height=15, out.extra='angle=90'}
-  c = biomod2::bm_PlotVarImpBoxplot(bm.out = myBiomodModelOut, group.by = c('expl.var', 'algo', 'algo'))
+  dummy = biomod2::bm_PlotVarImpBoxplot(bm.out = myBiomodModelOut, group.by = c('expl.var', 'algo', 'algo'))
 
 ```
 
 \pagebreak
 Projection of the ensemble models over the whole territory to predict group presence probabilities (multiplied by 1000 here): 
 ```{r echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.align='left', fig.width=20, fig.height=15}
-  c =   biomod2::plot(myBiomodEMProj)
+  dummy =   biomod2::plot(myBiomodEMProj)
 ```

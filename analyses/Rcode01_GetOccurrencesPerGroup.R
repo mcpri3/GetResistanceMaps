@@ -1,7 +1,7 @@
 #################################################
 ########## Prep. occurrence file ################
 #################################################
-install.packages('biomod2')
+# install.packages('biomod2')
 
 combi.doable <- openxlsx::read.xlsx(here::here('data/raw-data/FunctionalGroups/List-of-clustering-schemes.xlsx'))
 grid.fr <- sf::st_read(here::here('data/raw-data/Grids/ReferenceGrid_France_bin_1000m.gpkg'))

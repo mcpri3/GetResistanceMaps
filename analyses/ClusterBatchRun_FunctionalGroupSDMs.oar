@@ -3,7 +3,7 @@
 ## define OAR options
 #OAR -n ClusBaRu_FunGrSDMs
 #OAR --project teembio
-#OAR -l cpu=1,walltime=03:00:00
+#OAR -l cpu=1/nodes=1,walltime=03:00:00
 #OAR -O log.ClusBaRu_FunGrSDMs.%jobid%.stdout 
 #OAR -E log.ClusBaRu_FunGrSDMs.%jobid%.stderr 
 
@@ -19,4 +19,4 @@ R CMD BATCH "--args ${1} ${2}" ClusterBatchRun_Rcode02_GetEnsembleModels.R /dev/
 exit $? 
 
 ## oarsub -S './ClusterBatchRun_FunctionalGroupSDMs.oar Mammalia 1'
-## oarsub -S ./ClusterBatchRun_FunctionalGroupSDMs.oar --array-param-file array-of-params.txt (1 line per batch of param, see  Maya tuto)
+## oarsub -S ./ClusterBatchRun_FunctionalGroupSDMs.oar --array-param-file ../data/derived-data/inputSDM/list-of-params-for-batchrun.txt (1 line per batch of param, see  Maya tuto)
